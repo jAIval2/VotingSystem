@@ -1,53 +1,50 @@
 package voting;
-import javax.swing.table.DefaultTableModel;
+
 import javax.swing.*;
-import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.sql.*;
 
 public class Admin extends JFrame {
 
-    private JPasswordField passwordField;
-    private JButton enterButton;
+    private JTextField passwordField;
 
     public Admin() {
-        setTitle("Admin Panel");
-        setSize(600, 400);
+        setTitle("Admin Login");
+        setSize(300, 150);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
-        JPanel loginPanel = new JPanel(new GridLayout(2, 2));
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+
+        JLabel label = new JLabel("Enter Password:");
         passwordField = new JPasswordField();
-        enterButton = new JButton("Enter");
+        JButton loginButton = new JButton("Login");
 
-        loginPanel.add(new JLabel("Enter Password:"));
-        loginPanel.add(passwordField);
-        loginPanel.add(new JLabel()); // Empty label for spacing
-        loginPanel.add(enterButton);
+        panel.add(label);
+        panel.add(passwordField);
+        panel.add(loginButton);
 
-        add(loginPanel);
+        add(panel);
 
-        enterButton.addActionListener(new ActionListener() {
+        loginButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                String password = new String(passwordField.getPassword());
-
-                // Check if the provided password matches the expected password
-                if ("hehe".equals(password)) {
-                    // If authenticated, show the admin panel
-                    initializeAdminPanel();
+                String password = passwordField.getText();
+                if (password.equals("hehe")) {
+                    openAdminPanel();
                 } else {
-                    JOptionPane.showMessageDialog(Admin.this, "Invalid password.", "Login Failed", JOptionPane.ERROR_MESSAGE);
+                    JOptionPane.showMessageDialog(Admin.this, "Incorrect password!", "Error", JOptionPane.ERROR_MESSAGE);
                 }
             }
         });
     }
 
-    private void initializeAdminPanel() {
-        // Create and show voting results window
-        VotingResultsWindow resultsWindow = new VotingResultsWindow();
-        resultsWindow.setVisible(true);
+    private void openAdminPanel() {
+        AdminPanel adminPanel = new AdminPanel();
+        adminPanel.setVisible(true);
+        dispose(); // Close the login window
     }
 
     public static void main(String[] args) {
@@ -60,113 +57,138 @@ public class Admin extends JFrame {
     }
 }
 
-class VotingResultsWindow extends JFrame {
+class AdminPanel extends JFrame {
 
-    private JTable voterDetailsTable;
-    private JTextArea resultTextArea;
-
-    public VotingResultsWindow() {
-        setTitle("Voting Results");
-        setSize(600, 400);
-        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+    public AdminPanel() {
+        setTitle("Admin Panel");
+        setSize(300, 150);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
-        // Create panel for voter details table
-        JPanel voterDetailsPanel = new JPanel(new BorderLayout());
-        voterDetailsTable = new JTable();
-        JScrollPane scrollPane = new JScrollPane(voterDetailsTable);
-        voterDetailsPanel.add(scrollPane, BorderLayout.CENTER);
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
 
-        // Create panel for result text area
-        JPanel resultPanel = new JPanel(new BorderLayout());
-        resultTextArea = new JTextArea();
-        resultTextArea.setEditable(false);
-        resultPanel.add(new JScrollPane(resultTextArea), BorderLayout.CENTER);
+        JButton resultButton = new JButton("Result");
+        JButton analyticsButton = new JButton("Analytics");
+        JButton exitButton = new JButton("Exit");
 
-        // Create container panel to hold both voter details and result panels
-        JPanel containerPanel = new JPanel(new GridLayout(1, 2));
-        containerPanel.add(voterDetailsPanel);
-        containerPanel.add(resultPanel);
+        panel.add(resultButton);
+        panel.add(analyticsButton);
+        panel.add(exitButton);
 
-        add(containerPanel);
+        add(panel);
 
-        // Fetch voting details and display them
-        displayVoterDetails();
-        displayVotingResults();
+        resultButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                showResult();
+            }
+        });
+
+        analyticsButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                performAnalytics();
+            }
+        });
+
+        exitButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                // Close the admin panel and return to the login page
+                dispose();
+                new VotingSystemGUI().setVisible(true); // Show the login page again
+            }
+        });
     }
 
-    private void displayVoterDetails() {
-        DefaultTableModel model = new DefaultTableModel();
-        model.addColumn("Hashed Voter ID");
-        model.addColumn("Party Voted For");
-
+    private void showResult() {
         try {
             Connection connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/voting_system", "root", "hehe");
-            PreparedStatement preparedStatement = connection.prepareStatement("SELECT hashed_voter_id, party_voted_for FROM voters");
-            ResultSet resultSet = preparedStatement.executeQuery();
+            Statement statement = connection.createStatement();
 
-            while (resultSet.next()) {
-                String hashedVoterId = resultSet.getString("hashed_voter_id");
-                String partyVotedFor = resultSet.getString("party_voted_for");
-                model.addRow(new Object[]{hashedVoterId, partyVotedFor});
+            // Query to get total votes cast for each party
+            String totalVotesQuery = "SELECT party_voted_for, COUNT(*) AS total_votes FROM voters GROUP BY party_voted_for";
+            ResultSet totalVotesResult = statement.executeQuery(totalVotesQuery);
+
+            int totalVotesCast = 0;
+            while (totalVotesResult.next()) {
+                totalVotesCast += totalVotesResult.getInt("total_votes");
             }
 
+            // Query to get total votes for each party and calculate percentage
+            String resultQuery = "SELECT party_voted_for, COUNT(*) AS party_votes, " +
+                                 "ROUND((COUNT(*) * 100) / " + totalVotesCast + ", 2) AS vote_percentage " +
+                                 "FROM voters GROUP BY party_voted_for";
+            ResultSet resultSet = statement.executeQuery(resultQuery);
+
+            StringBuilder resultText = new StringBuilder("<html>");
+            while (resultSet.next()) {
+                String party = resultSet.getString("party_voted_for");
+                int partyVotes = resultSet.getInt("party_votes");
+                double votePercentage = resultSet.getDouble("vote_percentage");
+                resultText.append("<b>").append(party).append("</b>: ").append(partyVotes).append(" votes (").append(votePercentage).append("%)<br>");
+            }
+            resultText.append("</html>");
+
+            JOptionPane.showMessageDialog(this, resultText.toString(), "Election Result", JOptionPane.INFORMATION_MESSAGE);
+
+            totalVotesResult.close();
             resultSet.close();
-            preparedStatement.close();
+            statement.close();
             connection.close();
-        } catch (SQLException e) {
-            e.printStackTrace();
+        } catch (SQLException ex) {
+            ex.printStackTrace();
         }
-
-        voterDetailsTable.setModel(model);
     }
-
-    private void displayVotingResults() {
-        StringBuilder result = new StringBuilder();
-        int bjpVotes = 0;
-        int congressVotes = 0;
-        int aapVotes = 0;
-        int notaVotes = 0;
-
+    private void performAnalytics() {
         try {
             Connection connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/voting_system", "root", "hehe");
-            PreparedStatement preparedStatement = connection.prepareStatement("SELECT party_voted_for, COUNT(*) AS vote_count FROM voters GROUP BY party_voted_for");
-            ResultSet resultSet = preparedStatement.executeQuery();
+            Statement statement = connection.createStatement();
 
-            while (resultSet.next()) {
-                String partyVotedFor = resultSet.getString("party_voted_for");
-                int voteCount = resultSet.getInt("vote_count");
-
-                // Increment vote count for each party
-                switch (partyVotedFor) {
-                    case "BJP":
-                        bjpVotes += voteCount;
-                        break;
-                    case "INC":
-                        congressVotes += voteCount; // "INC" stands for Indian National Congress
-                        break;
-                    case "AAP":
-                        aapVotes += voteCount;
-                        break;
-                    case "NOTA":
-                        notaVotes += voteCount;
-                        break;
-                }
+            // Query to calculate average age
+            String avgAgeQuery = "SELECT AVG(hashed_age) AS avg_age FROM voters";
+            ResultSet avgAgeResult = statement.executeQuery(avgAgeQuery);
+            
+            double avgAge = 0;
+            if (avgAgeResult.next()) {
+                avgAge = avgAgeResult.getDouble("avg_age");
             }
 
-            // Display total votes for each party
-            result.append("Party: BJP, Votes: ").append(bjpVotes).append("\n");
-            result.append("Party: INC, Votes:").append(congressVotes).append("\n"); // Display total votes for INC
-            result.append("Party: AAP, Votes: ").append(aapVotes).append("\n"); // Display total votes for AAP
-            result.append("Party: NOTA, Votes: ").append(notaVotes).append("\n"); // Display total votes for NOTA
+            // Query to count voters in different age groups
+            String ageGroupsQuery = "SELECT " +
+                                    "SUM(CASE WHEN hashed_age BETWEEN 18 AND 25 THEN 1 ELSE 0 END) AS age_18_25_count, " +
+                                    "SUM(CASE WHEN hashed_age BETWEEN 26 AND 35 THEN 1 ELSE 0 END) AS age_26_35_count, " +
+                                    "SUM(CASE WHEN hashed_age BETWEEN 36 AND 50 THEN 1 ELSE 0 END) AS age_36_50_count, " +
+                                    "SUM(CASE WHEN hashed_age > 50 THEN 1 ELSE 0 END) AS age_above_50_count " +
+                                    "FROM voters";
+            ResultSet ageGroupsResult = statement.executeQuery(ageGroupsQuery);
 
-            resultTextArea.setText(result.toString());
+            int age18_25Count = 0, age26_35Count = 0, age36_50Count = 0, ageAbove50Count = 0;
+            if (ageGroupsResult.next()) {
+                age18_25Count = ageGroupsResult.getInt("age_18_25_count");
+                age26_35Count = ageGroupsResult.getInt("age_26_35_count");
+                age36_50Count = ageGroupsResult.getInt("age_36_50_count");
+                ageAbove50Count = ageGroupsResult.getInt("age_above_50_count");
+            }
 
-            resultSet.close();
-            preparedStatement.close();
+            // Display analytics results
+            String analyticsMessage = "Analytics Results:\n" +
+                                      "Average Age: " + avgAge + "\n" +
+                                      "Age 18-25 Count: " + age18_25Count + "\n" +
+                                      "Age 26-35 Count: " + age26_35Count + "\n" +
+                                      "Age 36-50 Count: " + age36_50Count + "\n" +
+                                      "Age Above 50 Count: " + ageAbove50Count;
+
+            JOptionPane.showMessageDialog(this, analyticsMessage, "Analytics", JOptionPane.INFORMATION_MESSAGE);
+
+            avgAgeResult.close();
+            ageGroupsResult.close();
+            statement.close();
             connection.close();
-        } catch (SQLException e) {
-            e.printStackTrace();
+        } catch (SQLException ex) {
+            ex.printStackTrace();
         }
     }
+
 }
