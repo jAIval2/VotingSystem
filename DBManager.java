@@ -5,24 +5,25 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 
 public class DBManager {
-    private Connection connection;
-    private final String url = "jdbc:mysql://localhost:3306/voting_system";
-    private final String username = "root";
-    private final String password = "hehe";
 
-    public DBManager() {
+    private static final String DB_URL = "jdbc:mysql://localhost:3306/voting_system";
+    private static final String DB_USER = "root";
+    private static final String DB_PASSWORD = "hehe";
+
+    private static Connection connection;
+
+    public static Connection getConnection() {
         try {
-            connection = DriverManager.getConnection(url, username, password);
+            if (connection == null || connection.isClosed()) {
+                connection = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
+            }
         } catch (SQLException e) {
             e.printStackTrace();
         }
-    }
-
-    public Connection getConnection() {
         return connection;
     }
 
-    public void closeConnection() {
+    public static void closeConnection() {
         try {
             if (connection != null && !connection.isClosed()) {
                 connection.close();
