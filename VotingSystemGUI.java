@@ -6,15 +6,12 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
 
 public class VotingSystemGUI extends JFrame {
 
     private CardLayout cardLayout;
     private JPanel cardPanel;
+    private JTextField nameField;
     private JTextField ageField;
     private JTextField voterIdField;
 
@@ -37,14 +34,17 @@ public class VotingSystemGUI extends JFrame {
 
     private JPanel createLoginPanel() {
         JPanel loginPanel = new JPanel(new BorderLayout());
-        JPanel inputPanel = new JPanel(new GridLayout(3, 2));
+        JPanel inputPanel = new JPanel(new GridLayout(4, 2));
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
 
+        nameField = new JTextField();
         ageField = new JTextField();
         voterIdField = new JTextField();
         JButton loginButton = new JButton("Login");
         JButton adminButton = new JButton("Admin Panel");
 
+        inputPanel.add(new JLabel("Enter your Name:"));
+        inputPanel.add(nameField);
         inputPanel.add(new JLabel("Enter your Age:"));
         inputPanel.add(ageField);
         inputPanel.add(new JLabel("Enter your Voter ID:"));
@@ -59,11 +59,23 @@ public class VotingSystemGUI extends JFrame {
         loginButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
+                String name = nameField.getText();
                 String age = ageField.getText();
                 String voterId = voterIdField.getText();
 
-                // Navigate to Party Selection page after successful login
-                cardLayout.show(cardPanel, "party");
+                // Validate age
+                int ageInt = Integer.parseInt(age);
+                if (ageInt >= 18) {
+                    // Hash name, age, and voter ID
+                    String hashedName = hashString(name);
+                    String hashedAge = hashString(age);
+                    String hashedVoterId = hashString(voterId);
+
+                    // Navigate to Party Selection page after successful login
+                    cardLayout.show(cardPanel, "party");
+                } else {
+                    JOptionPane.showMessageDialog(VotingSystemGUI.this, "You must be at least 18 years old to vote.", "Age Validation Error", JOptionPane.ERROR_MESSAGE);
+                }
             }
         });
 
@@ -82,9 +94,14 @@ public class VotingSystemGUI extends JFrame {
         JPanel partyPanel = new JPanel(new BorderLayout());
         JPanel buttonPanel = new JPanel(new GridLayout(4, 1));
 
-        JButton partyButton1 = new JButton("Bharatiya Janata Party (BJP)");
-        JButton partyButton2 = new JButton("Indian National Congress (INC)");
-        JButton partyButton3 = new JButton("Aam Aadmi Party (AAP)");
+        // Placeholder for party logos
+        ImageIcon bjpLogo = new ImageIcon("bjp_logo.jpg");
+        ImageIcon incLogo = new ImageIcon("inc_logo.jpg");
+        ImageIcon aapLogo = new ImageIcon("aap_logo.jpg");
+
+        JButton partyButton1 = new JButton("Bharatiya Janata Party (BJP)", bjpLogo);
+        JButton partyButton2 = new JButton("Indian National Congress (INC)", incLogo);
+        JButton partyButton3 = new JButton("Aam Aadmi Party (AAP)", aapLogo);
         JButton notaButton = new JButton("NOTA");
 
         buttonPanel.add(partyButton1);
@@ -97,7 +114,7 @@ public class VotingSystemGUI extends JFrame {
         partyButton1.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                registerVote("BJP");
+            	registerVote("BJP");
             }
         });
 
@@ -126,13 +143,18 @@ public class VotingSystemGUI extends JFrame {
     }
 
     private void registerVote(String party) {
+        String name = nameField.getText();
         String age = ageField.getText();
         String voterId = voterIdField.getText();
+
+        // Hash name, age, and voter ID
+        String hashedName = hashString(name);
         String hashedAge = hashString(age);
         String hashedVoterId = hashString(voterId);
 
+        // Register vote with hashed details
         VotingSystemDAO dao = new VotingSystemDAO();
-        dao.insertVoterDetails(hashedAge, hashedVoterId, party);
+        dao.insertVoterDetails(hashedName, hashedAge, hashedVoterId, party);
         dao.closeConnection();
 
         // Navigate back to login page after registering vote
@@ -160,7 +182,7 @@ public class VotingSystemGUI extends JFrame {
         }
     }
 
-    public static void main(String[] args) {
+    public static void  main(String[] args) {
         SwingUtilities.invokeLater(new Runnable() {
             @Override
             public void run() {
@@ -169,3 +191,4 @@ public class VotingSystemGUI extends JFrame {
         });
     }
 }
+
